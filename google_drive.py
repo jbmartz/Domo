@@ -157,7 +157,7 @@ class GoogleDriveAPI:
     #           a dictionary containing the id and name of the created file
     #
     def gd_create_text_file(self, name, parent_id, contents):
-        headers = {'Content-Type': 'Content-Type: multipart/related; boundary=boundary'}
+        headers = {'Content-Type': 'multipart/related; boundary=boundary'}
         boundary = '--boundary';
         parents = [parent_id]
         url_params = {
@@ -172,7 +172,6 @@ class GoogleDriveAPI:
 
         multi_part_request_body = boundary + "\nContent-Type: text/plain\n\n" + contents + "\n" + boundary + "--"
         concat = boundary + "\nContent-Type: application/json; charset=UTF-8\n\n" + json.dumps(meta_data) + "\n" + multi_part_request_body
-        print(concat)
 
 
         ret_val = GoogleDriveAPI.make_request(self, method="POST", url=GD_UPLOAD_BASE_URI, headers=headers, url_params=url_params, body=concat)
