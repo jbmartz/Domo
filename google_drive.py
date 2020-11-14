@@ -8,7 +8,7 @@ GD_METADATA_BASE_URI = "https://www.googleapis.com/drive/v3/files/"
 
 
 class GoogleDriveAPI:
-    token = None        # the access token to use in requests
+    token = None  # the access token to use in requests
 
     # Constructor
     def __init__(self, token):
@@ -60,9 +60,9 @@ class GoogleDriveAPI:
     # Note: Google will not show files that are not created by the application
     #
     def gd_list(self, dir_id=None):
-        #"application/vnd.google-apps.folder"
+        # "application/vnd.google-apps.folder"
 
-        if(dir_id is None):
+        if dir_id is None:
             ret_val = GoogleDriveAPI.make_request(self, method="GET", url=GD_METADATA_BASE_URI)
 
             if ret_val[0] != 200:
@@ -78,7 +78,6 @@ class GoogleDriveAPI:
                 "q": "parents in '{}'".format(dir_id)
             }
 
-
             ret_val = GoogleDriveAPI.make_request(self, method="GET", url=GD_METADATA_BASE_URI, url_params=url_params)
 
             if ret_val[0] != 200:
@@ -87,8 +86,6 @@ class GoogleDriveAPI:
             files = [json.loads(ret_val[1])]
 
             return files[0]['files']
-
-
 
     # TODO: Retrieve metadata about an object (Files:get endpoint)
     #   Input: res_id = id of an object (file/directory)
@@ -100,20 +97,14 @@ class GoogleDriveAPI:
         if res_id is None:
             return None
 
-        url_params = {
-            "fileId": res_id,
-            "fields": "files(id,name,parents)",
-            "spaces": "drive"
-        }
-
-        ret_val = GoogleDriveAPI.make_request(self, method="GET", url=GD_METADATA_BASE_URI, url_params=url_params)
-
+        ret_val = GoogleDriveAPI.make_request(self, method="GET", url=GD_METADATA_BASE_URI + res_id,
+                                              url_params={"fields": "id,name,parents"})
         if ret_val[0] != 200:
             return None
 
         files = [json.loads(ret_val[1])]
 
-        return files[0]['files'][0]
+        return files[0]
 
     # TODO: Create a directory in a given directory (Files:create metadata uri endpoint)
     #   Input: name = name of directory to create
@@ -124,6 +115,8 @@ class GoogleDriveAPI:
     #           a dictionary containing the id and name of the created directory
     #
     def gd_create_directory(self, name, parent_id=None):
+        if name is None:
+            return None
 
         if parent_id is None:
             body = {
@@ -136,18 +129,14 @@ class GoogleDriveAPI:
                 'mimeType': 'application/vnd.google-apps.folder',
                 'parents': [parent_id]
             }
-        headers = {'Content-type': 'application/json'}
 
-        url_params = {
-            "includeItemsFromAllDrives": True
-        }
-
-        ret_val = GoogleDriveAPI.make_request(self, method="POST", url=GD_METADATA_BASE_URI, headers=headers, url_params=url_params, body=json.dumps(body))
+        ret_val = GoogleDriveAPI.make_request(self, method="POST", url=GD_METADATA_BASE_URI, headers={'Content-type': 'application/json'}, body=json.dumps(body))
         if ret_val[0] != 200:
             return None
 
         ret_dict = json.loads(ret_val[1])
         return ret_dict
+
     # TODO: Create a new file with text data in a given directory (Files:create upload uri endpoint)
     #   Input: name = name of the text file to create
     #          parent_id = id of directory under which the new
@@ -157,26 +146,23 @@ class GoogleDriveAPI:
     #           a dictionary containing the id and name of the created file
     #
     def gd_create_text_file(self, name, parent_id, contents):
+        if name is None or parent_id is None or contents is None:
+            return None
         headers = {'Content-Type': 'multipart/related; boundary=boundary'}
         boundary = '--boundary';
-        parents = [parent_id]
-        url_params = {
-            "uploadType": "multipart"
-        }
         meta_data = {
-            "parents": parents,
+            "parents": [parent_id],
             "name": name,
             'mimeType': 'application/vnd.google-apps.file'
         }
 
-
         multi_part_request_body = boundary + "\nContent-Type: text/plain\n\n" + contents + "\n" + boundary + "--"
-        concat = boundary + "\nContent-Type: application/json; charset=UTF-8\n\n" + json.dumps(meta_data) + "\n" + multi_part_request_body
+        concat = boundary + "\nContent-Type: application/json; charset=UTF-8\n\n" + json.dumps(
+            meta_data) + "\n" + multi_part_request_body
+        ret_val = GoogleDriveAPI.make_request(self, method="POST", url=GD_UPLOAD_BASE_URI, headers=headers,
+                                              url_params={"uploadType": "multipart"}, body=concat)
 
-
-        ret_val = GoogleDriveAPI.make_request(self, method="POST", url=GD_UPLOAD_BASE_URI, headers=headers, url_params=url_params, body=concat)
-        print(ret_val)
-        return None
+        return json.loads(ret_val[1])
 
     # TODO: Update text data in an existing file (Files:update upload uri endpoint)
     #   Input: file_id = id of file to update
@@ -185,8 +171,18 @@ class GoogleDriveAPI:
     #           a dictionary containing the id and name of the updated file
     #
     def gd_update_text_file(self, file_id, contents):
-        print("API error:: File update: Not implemented")
-        return None
+
+        if file_id is None or contents is None:
+            return None
+
+        ret_val = GoogleDriveAPI.make_request(self, method="PATCH", url=GD_UPLOAD_BASE_URI + file_id, headers={"Content-Type": "text/plain"},
+                                              url_params={"uploadType": "media"}, body=contents)
+
+        if ret_val[0] != 200:
+            return None
+
+        return ret_val[1]
+
 
     # TODO: Export/download text contents of a file (Files:export endpoint)
     #   Input: file_id = id of file to download
@@ -195,8 +191,16 @@ class GoogleDriveAPI:
     #
     # NOTE: Set mime type as text/plain when downloading text file
     def gd_export_text_file(self, file_id):
-        print("API error:: File retrieval: Not implemented")
-        return None
+        if file_id is None:
+            return None
+
+        ret_val = GoogleDriveAPI.make_request(self, method="GET", url=GD_METADATA_BASE_URI + file_id + "/export", url_params={
+            "mimeType": "text/plain"})
+
+        if ret_val[0] != 200:
+            return None
+
+        return ret_val[1]
 
     # TODO: Delete a file/directory (Files:delete endpoint)
     #   Input: res_id = id of file or directory to delete
@@ -204,6 +208,9 @@ class GoogleDriveAPI:
     #           an empty string
     #
     def gd_delete(self, res_id):
-        print("API error:: File deletion: Not implemented")
-        return None
+        ret_val = GoogleDriveAPI.make_request(self, method="DELETE", url=GD_METADATA_BASE_URI + res_id)
 
+        if ret_val[0] != 204:
+            return None
+
+        return ""
